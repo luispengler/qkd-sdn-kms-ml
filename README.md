@@ -1,0 +1,26 @@
+# Physics-Informed Neural SDN Controller & ETSI-014 KMS for Multi-Hop QKD Networks
+
+An integrated quantum network emulation, machine learning optimization, and Key Management System (KMS) framework bridging **physical-layer finite-key Decoy-State BB84 dynamics** with **ETSI GS QKD 014 REST APIs** and **Software-Defined Networking (SDN)** multi-hop routing.
+
+## Architecture Overview
+
+1. **Physical Layer & Fundamental ML Surrogate (`qkd_physics_ml.py`):**
+   - Models realistic fiber-optic quantum channels characterized by fiber length $L$ (km), attenuation $\alpha$ (dB/km), detector efficiency $\eta_d$, dark count probability $Y_0$, optical misalignment error $e_{\text{det}}$, and finite block size $N$.
+   - Evaluates the non-asymptotic Secret Key Rate (SKR) for **3-intensity Decoy-State BB84** ($\mu$ signal, $\nu$ weak decoy, $\omega=0$ vacuum) under finite-key statistical fluctuations (Chernoff/Hoeffding bounds).
+   - Trains a **PyTorch Multi-Layer Perceptron (MLP)** surrogate model to bypass slow real-time non-convex numerical optimization (`scipy.optimize`), mapping real-time channel observables $(L, Y_0, e_{\text{det}}, \eta_d) \mapsto (\mu^*, \nu^*, p_\mu^*, \text{SKR}^*)$ in sub-millisecond inference time.
+
+2. **ETSI GS QKD 014 Key Management System & SDN Controller (`kms_sdn_api.py`):**
+   - Exposes standard **ETSI GS QKD 014 REST API** endpoints (`/api/v1/keys/{slave_SAE_ID}/status`, `/api/v1/keys/{slave_SAE_ID}/enc_keys`, and `/api/v1/keys/{master_SAE_ID}/dec_keys`) for Key Management Entities (KME/KMS).
+   - Implements a **Software-Defined Networking (SDN) Controller** over a multi-domain quantum network topology (`NetworkX`), querying the PyTorch neural surrogate to weight optical links by their实时 achievable Secret Key Rate and computing optimal multi-hop key relay paths (trusted-node / entanglement-assisted routing).
+   - Supports hybrid Post-Quantum Cryptography (PQC) + QKD key mixing (`SHA3-256` KDF) and simulated QRNG entropy seeding for crypto-agile KMS testing.
+
+## Quickstart
+
+```bash
+pip install -r requirements.txt
+
+# 1. Generate physical decoy-state BB84 dataset and train the PyTorch MLP surrogate
+python qkd_physics_ml.py --samples 5000 --epochs 60
+
+# 2. Launch the ETSI-014 KMS & SDN Controller REST API server
+uvicorn kms_sdn_api:app --reload --port 8000
